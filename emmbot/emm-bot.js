@@ -9,7 +9,7 @@ const cleverbot = require("better-cleverbot-io");
 
 const EmotionalModel = require('./lib/emotion');
 
-let ledstate;
+let ledstate, discoState, heatState;
 let temp_data = [];
 let current_temp = { min: null, max: null};
 
@@ -68,9 +68,9 @@ function switchLight(message){
     let state = message.toString();
     let newstate = null;
 
-    if (state == "on") {
+    if (state == "light-on") {
         newstate = true;
-    } else if (state == "off") {
+    } else if (state == "light-off") {
         newstate = false;
     }
     console.log("LED state", state);
@@ -172,13 +172,26 @@ botcontroller.hears(['current temp', 'temperature', 'weather'], channels, (bot, 
     bot.reply(message, "My current temperature is: " + current_temp.c);
 });
 
-
 botcontroller.hears(['light(.?) on', 'on(.?) the light(.?)'], channels, (bot, message) => {
 
     ledstate = true;
-    client.publish(light_pub_topic, "on");
+	SendOnReply(bot, message, "light-on");
+});
 
-    let user = `<@${message.user}>`;
+botcontroller.hears(['disco on', 'on(.?) the disco(.?)', 'party start', 'start(.?) the party'], channels, (bot, message) => {
+    discoState = true;
+	SendOnReply(bot, message, "disco-on");
+});
+
+botcontroller.hears(['heat on','heater on','make it hot'], channels, (bot, message) => {
+    heatState = true;
+	SendOnReply(bot, message, "heater-on");
+});
+
+function SendOnReply(bot, message, instruction){
+	client.publish(light_pub_topic, instruction);
+	
+	let user = `<@${message.user}>`;
     let replies = [
         `There you go ${user}`,
         `If that's what you'd like me to do`,
@@ -189,12 +202,25 @@ botcontroller.hears(['light(.?) on', 'on(.?) the light(.?)'], channels, (bot, me
     let response = replies[Math.floor(Math.random() * replies.length)];
 
     bot.reply(message, response);
-});
+}
 
 botcontroller.hears(['light(.?) off', 'off(.?) the light(.?)'], channels, (bot, message) => {
-
     ledstate = false;
-    client.publish(light_pub_topic, "off");
+	SendOffReply(bot, message, "light-off");
+});
+
+botcontroller.hears(['disco off', 'off(.?) the disco(.?)', 'party stop', 'stop(.?) the party'], channels, (bot, message) => {
+    discoState = false;
+	SendOffReply(bot, message, "disco-off");
+});
+
+botcontroller.hears(['heat off','heater off','make it cold'], channels, (bot, message) => {
+    heatState = false;
+	SendOffReply(bot, message, "heater-off");
+});
+
+function SendOffReply(bot, message, instruction){
+	client.publish(light_pub_topic, instruction);
 
     let user = `<@${message.user}>`;
     let replies = [
@@ -207,7 +233,7 @@ botcontroller.hears(['light(.?) off', 'off(.?) the light(.?)'], channels, (bot, 
     let response = replies[Math.floor(Math.random() * replies.length)];
 
     bot.reply(message, response);
-});
+}
 
 botcontroller.hears(['light(.?)$'], channels, (bot, message) => {
     bot.startConversation(message, (err, convo) => {
@@ -229,9 +255,9 @@ botcontroller.hears(['light(.?)$'], channels, (bot, message) => {
             pattern: bot.utterances.yes,
             callback: (response, convo) => {
                 if (ledstate) {
-                    client.publish(light_pub_topic, "off");
+                    client.publish(light_pub_topic, "light-off");
                 } else {
-                    client.publish(light_pub_topic, "on");
+                    client.publish(light_pub_topic, "light-on");
                 }
                 ledstate = !ledstate;
                 convo.say(`Okay, the light is now ${question_state}.`);
@@ -291,13 +317,61 @@ botcontroller.hears(['notify me'], channels, (bot, message) => {
 });
 
 botcontroller.hears([''],channels, (bot,message) => {  
-    var msg = message.text;
+	SendCleverLocalReply(bot, message);
+    //SendCleverBotIoReply(bot, message);
+});
+
+function SendCleverBotIoReply(bot, message){
+	var msg = message.text;
+	bot.replyWithTyping(message,"");
 	smartBot.ask(msg).then((response => {
 		bot.reply(message, response);
 	})).catch(err => {
 		bot.reply(message, "Cleverbot Exception: " + err);
-	});
-});
+	})
+}
+
+function SendCleverLocalReply(bot, message){
+	
+	let user = `<@${message.user}>`;	
+    let dunno_replies = [
+        `Dunno ${user}`, 
+		`I have no idea ${user}`, 
+		`I haven't a clue ${user}`, 
+		`${user}, I haven't the faintest idea`, 
+		`How should I know ${user}?`, 
+		`Don't ask me`, 
+		`Search me`, 
+		`Who knows?`, 
+		`It's anyone's guess`, 
+		`${user}, Your guess is as good as mine`, 
+		`Not as far as I know ${user}`, 
+		`It beats me`, 
+		`${user}, This is what I know, and I will have more information for you soon.`, 
+		`${user}, I'm not the right person to ask about this, let's find out who can answer your question.`, 
+		`${user}, I hear your concern, so give me an opportunity to get the right answer for you.`
+    ];
+	
+	let function_replies = [
+		"`hello`, `hi`, `yo `, `hey` to greet me", 
+		"`how are you`, `emotion` to find my emotional state", 
+		"`current temp`, `temperature`, `weather` to find out the current temperature in the house", 
+		"`light on`, `on the light`, `lights on`, `on the lights` to switch the lights on in the house", 
+		"`disco on`, `on the disco`, `party start`, `start the party` to switch on some disco lights in the house", 
+		"`heat on`,`heater on`,`make it hot` to turn the heater on in the house", 
+		"`light off`, `off the light`, `light off`, `off the light` to switch the lights off in the house", 
+		"`disco off`, `off the disco`, `party stop`, `stop the party` to switch off the disco lights in the house", 
+		"`heat off`,`heater off`,`make it cold` to turn the heater off in the house", 
+		"`light`, `lights` to find out the current status of the lights and maybe switch it on or off", 
+		"`notify me` to get a direct message when someone else switches the lights on or off"
+	];
+
+    let dunno_response = dunno_replies[Math.floor(Math.random() * dunno_replies.length)];
+	let function_response = function_replies[Math.floor(Math.random() * function_replies.length)];
+	let response = dunno_response + " :confused: \nI can do some cool stuff though. Try " + function_response;
+
+    bot.reply(message, response);
+}
 
 function update_emotions() {
     // go through emotion updating process.
