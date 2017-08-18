@@ -32,6 +32,7 @@ const light_pub_topic = process.env.UNIQ_TOPIC + "/light/ic";
 
 const topics = [temperature_sub_topic, light_sub_topic];
 client.on('connect', function () {
+	console.log("MQTT Server connected");
     console.log("Listening for topics " + topics);
     client.subscribe(topics);
 });
@@ -66,7 +67,7 @@ function recordTemperature(message){
 function switchLight(message){
 	 // message is Buffer
     let state = message.toString();
-    let newstate = null;
+    let newstate = ledstate;
 
     if (state == "light-on") {
         newstate = true;
@@ -88,6 +89,13 @@ function switchLight(message){
     }
 
     ledstate = newstate;
+	
+	if (state == "manual-on" || state == "manual-off") {
+        bot.say({
+			text: "Someone manually flicked the lights " + (ledstate ? "on" : "off") + "!!!",
+			channel: "play-with-embot"
+		});
+    }
 }
 
 var smartBot = new cleverbot({user:process.env.CLEVERBOT_APIUSER, key:process.env.CLEVERBOT_APIKEY, nick:'EmBot'});

@@ -3,8 +3,8 @@ const five = require('johnny-five');
 const mqtt = require('mqtt');
 
 let temp_sensor;
-let led, rgb, heater;
-let disco_on, heater_on, heat_rising;
+let led, rgb, heater, bumper;
+let led_on, disco_on, heater_on, heat_rising;
 
 let board = new five.Board({repl: false,});
 
@@ -24,7 +24,8 @@ board.on("ready", () => {
 	led = new five.Led(process.env.LED_PIN);
 	heater = new five.Led(11);
 	rgb = new five.Led.RGB([6, 5, 3]);
-	disco_on = heater_on = heat_rising= false;	
+	bumper = new five.Button(7);
+	led_on = disco_on = heater_on = heat_rising= false;	
 	var index = 0;
 	
     temp_sensor = new five.Thermometer({
@@ -46,6 +47,21 @@ board.on("ready", () => {
         //console.log(msg);
     });
 	
+	bumper.on("hit", function() {
+		if(led_on)
+		{
+			led.off();			
+		}
+		else{
+			led.on();
+		}
+		led_on = !led_on;
+		let state = led_on ? "light-on" : "light-off";
+		client.publish(light_pub_topic, state);
+		let manualAction = led_on ? "manual-on" : "manual-off";
+		client.publish(light_pub_topic, manualAction);
+	});
+	
 	board.loop(1000, function() {
 		if(disco_on)
 		{
@@ -63,10 +79,10 @@ board.on("ready", () => {
 		{
 			if(heat_rising)
 			{
-				heater.fadeOut()
+				heater.fadeOut(2000);
 			}
 			else{
-				heater.fadeIn()
+				heater.fadeIn(2000);
 			}
 			heat_rising = !heat_rising;
 		}
@@ -92,8 +108,8 @@ client.on('message', (topic, message) => {
     let state = message.toString();
 
 	switch(state){
-		case "light-on": led.on();break;
-		case "light-off": led.off();break;
+		case "light-on": led.on(); led_on = true; break;
+		case "light-off": led.off(); led_on = false; break;
 		case "disco-on": disco_on = true; break;
 		case "disco-off": disco_on = false; break;
 		case "heater-on": heater_on = true; break;
